@@ -1,0 +1,135 @@
+{
+  "name": "anonvent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}'use client'
+
+import { useState } from 'react'
+
+export default function Home() {
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [messages, setMessages] = useState([])
+
+  async function handleSend(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    const userMsg = { role: 'user', content: text }
+    setMessages(prev => [...prev, { ...userMsg, id: Date.now(), from: 'you' }])
+    setText('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg.content })
+      })
+      const data = await res.json()
+      const botMsg = { role: 'assistant', content: data.reply }
+      setMessages(prev => [...prev, { ...botMsg, id: Date.now()+1, from: 'ai' }])
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, şu an cevap veremiyorum — birazdan tekrar deneyin.', id: Date.now()+2, from: 'ai' }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-violet-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-xl bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-6">
+        <h1 className="text-2xl font-semibold mb-2">AnonVent — İçini dök, hafifle</h1>
+        <p className="text-sm text-gray-600 mb-4">Kimliğin paylaşılmaz. Samimi, neşeli ve teskin edici cevaplar alırsın.</p>
+
+        <div className="space-y-3 max-h-96 overflow-auto mb-4">
+          {messages.length === 0 && (
+            <div className="text-center text-sm text-gray-500">İçini dökmek için aşağıya yaz — burası güvenli bir alan.</div>
+          )}
+          {messages.map(m => (
+            <div key={m.id} className={m.from === 'you' ? 'text-right' : 'text-left'}>
+              <div className={`inline-block p-3 rounded-xl ${m.from === 'you' ? 'bg-indigo-50' : 'bg-rose-50'}`}>
+                <div className="text-sm">{m.content}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={handleSend} className="flex gap-2">
+          <input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="İçini dök..."
+            className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none"
+          />
+          <button type="submit" disabled={loading} className="px-4 py-2 rounded-xl bg-indigo-600 text-white disabled:opacity-60">Gönder</button>
+        </form>
+
+        <footer className="mt-4 text-xs text-gray-500">Gizlilik: Mesajlar varsayılan olarak saklanmaz. Sunucu ayarını değiştirmediysen hiçbir veri depolanmaz.</footer>
+      </div>
+    </main>
+  )
+}import fetch from 'node-fetch'
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end()
+  const { message } = req.body || {}
+  if (!message) return res.status(400).json({ error: 'Boş mesaj' })
+
+  const crisisKeywords = ['intihar', 'öldür', 'ölmek', 'yok olmak', 'kendine zarar']
+  const lower = message.toLowerCase()
+  for (const k of crisisKeywords) {
+    if (lower.includes(k)) {
+      return res.status(200).json({ reply: 'Bunu duyduğuma çok üzüldüm. Eğer kendine zarar verme düşüncen varsa lütfen acil olarak yerel yardım hatlarını ara veya güvendiğin bir kişiyle konuş. Türkiye için acil arama: 112. Profesyonel destek almak çok önemli.' })
+    }
+  }
+
+  const OPENAI_KEY = process.env.OPENAI_API_KEY
+  if (!OPENAI_KEY) return res.status(500).json({ error: 'Sunucu ayarlı değil: OPENAI_API_KEY eksik' })
+
+  const systemPrompt = `Sen nazik, samimi, neşeli ve teselli edici bir yardımcısın. Kısa, insan odaklı, empatik cevaplar ver. Tıbbi ya da profesyonel öneri vermeden önce kullanıcıyı profesyonellere yönlendir.`
+
+  try {
+    const apiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 300,
+        temperature: 0.9
+      })
+    })
+    const apiJson = await apiRes.json()
+    const reply = apiJson?.choices?.[0]?.message?.content || 'Üzgünüm, cevap üretilirken hata oldu.'
+    return res.status(200).json({ reply })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'AI çağrısında hata' })
+  }
+}module.exports = {
+  content: ["./app/**/*.{js,jsx,ts,tsx}", "./pages/**/*.{js,jsx,ts,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
+}@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg: #f8fafc }
+html,body,#__next { height: 100% }
+
+/* Basit, temiz görünüm */
