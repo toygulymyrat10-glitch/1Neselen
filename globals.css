@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg: #f8fafc }
+html,body,#__next { height: 100% }
+
+/* Basit, temiz görünüm */
